@@ -1,0 +1,50 @@
+{{- if .Values.prometheusRule.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "portfolio-sample.fullname" . }}
+  labels:
+    {{- include "portfolio-sample.labels" . | nindent 4 }}
+spec:
+  groups:
+    - name: portfolio-sample
+      rules:
+        - alert: PortfolioSampleHighErrorRate
+          expr: |
+            (
+              sum(rate(http_requests_total{namespace="{{ .Release.Namespace }}",path=~"/api/.+",code=~"5.."}[5m]))
+              /
+              sum(rate(http_requests_total{namespace="{{ .Release.Namespace }}",path=~"/api/.+"}[5m]))
+            ) > {{ .Values.prometheusRule.thresholds.errorRate }}
+          for: {{ .Values.prometheusRule.for }}
+          labels:
+            severity: warning
+          annotations:
+            summary: portfolio-sample is returning HTTP 5xx responses
+            description: More than {{ .Values.prometheusRule.thresholds.errorRate }} of /api requests in namespace {{ .Release.Namespace }} returned 5xx over 5 minutes.
+            runbook_url: {{ .Values.prometheusRule.runbookBaseURL }}/high-error-rate.md
+        - alert: PortfolioSampleHighLatency
+          expr: |
+            histogram_quantile(0.95,
+              sum by (le) (
+                rate(http_request_duration_seconds_bucket{namespace="{{ .Release.Namespace }}",path=~"/api/.+"}[5m])
+              )
+            ) > {{ .Values.prometheusRule.thresholds.latencySeconds }}
+          for: {{ .Values.prometheusRule.for }}
+          labels:
+            severity: warning
+          annotations:
+            summary: portfolio-sample p95 latency is high
+            description: The 95th percentile /api latency in namespace {{ .Release.Namespace }} is above {{ .Values.prometheusRule.thresholds.latencySeconds }} seconds.
+            runbook_url: {{ .Values.prometheusRule.runbookBaseURL }}/high-latency.md
+        - alert: PortfolioSamplePodCrashLoop
+          expr: |
+            kube_pod_container_status_waiting_reason{namespace="{{ .Release.Namespace }}",reason="CrashLoopBackOff"} > 0
+          for: {{ .Values.prometheusRule.for }}
+          labels:
+            severity: critical
+          annotations:
+            summary: portfolio-sample container is crash looping
+            description: A container in namespace {{ .Release.Namespace }} is waiting in CrashLoopBackOff.
+            runbook_url: {{ .Values.prometheusRule.runbookBaseURL }}/pod-crashloop.md
+{{- end }}

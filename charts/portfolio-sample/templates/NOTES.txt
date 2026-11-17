@@ -1,0 +1,7 @@
+portfolio-sample is installed in namespace {{ .Release.Namespace }}.
+
+The Service listens on port {{ .Values.service.port }}.
+Liveness is GET /healthz. Readiness is GET /readyz. Metrics are GET /metrics.
+
+Read the Grafana admin password from the Kubernetes secret named by the
+kube-prometheus-stack values. This chart does not contain that password.

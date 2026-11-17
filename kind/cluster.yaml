@@ -1,0 +1,10 @@
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: portfolio
+networking:
+  # nftables does not need the xt_statistic match. Some kernels, including
+  # nested VMs without that module, cannot run kube-proxy in iptables mode.
+  kubeProxyMode: nftables
+nodes:
+  - role: control-plane
+    image: kindest/node:v1.35.8

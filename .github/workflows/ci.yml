@@ -1,0 +1,124 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  app:
+    name: App lint and tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+      - name: Format, vet, and test
+        run: make lint-app test check-metrics
+
+  docker:
+    name: Docker build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image and run it read-only
+        run: make docker-smoke
+
+  helm:
+    name: Helm and kubeconform
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Helm and kubeconform
+        run: |
+          set -euo pipefail
+          source scripts/versions.env
+          curl -fsSL -o /tmp/helm.tgz "https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz"
+          tar -C /tmp -xzf /tmp/helm.tgz
+          sudo install -m 0755 /tmp/linux-amd64/helm /usr/local/bin/helm
+          curl -fsSL -o /tmp/kubeconform.tgz "https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz"
+          tar -C /tmp -xzf /tmp/kubeconform.tgz
+          sudo install -m 0755 /tmp/kubeconform /usr/local/bin/kubeconform
+          helm repo add grafana https://grafana.github.io/helm-charts
+          helm repo update grafana
+      - name: Lint and kubeconform
+        run: make helm-lint kubeconform
+
+  yaml:
+    name: yamllint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install yamllint
+        run: pip3 install yamllint==1.38.0
+      - name: Lint YAML
+        run: make yamllint
+
+  terraform:
+    name: Terraform fmt and validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Terraform
+        run: |
+          set -euo pipefail
+          source scripts/versions.env
+          curl -fsSL -o /tmp/terraform.zip "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip"
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq unzip
+          unzip -o /tmp/terraform.zip -d /tmp
+          sudo install -m 0755 /tmp/terraform /usr/local/bin/terraform
+      - name: fmt and validate
+        run: make terraform-validate
+
+  gitleaks:
+    name: gitleaks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install gitleaks
+        run: |
+          set -euo pipefail
+          source scripts/versions.env
+          curl -fsSL -o /tmp/gitleaks.tgz "https://github.com/gitleaks/gitleaks/releases/download/${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION#v}_linux_x64.tar.gz"
+          tar -C /tmp -xzf /tmp/gitleaks.tgz
+          sudo install -m 0755 /tmp/gitleaks /usr/local/bin/gitleaks
+      - name: Scan history
+        run: gitleaks detect --source . --log-opts="--all" --redact --verbose
+
+  kind-smoke:
+    name: kind smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install kind, kubectl, and Helm
+        run: |
+          set -euo pipefail
+          source scripts/versions.env
+          curl -fsSL -o /tmp/kind "https://kind.sigs.k8s.io/dl/${KIND_VERSION}/kind-linux-amd64"
+          sudo install -m 0755 /tmp/kind /usr/local/bin/kind
+          curl -fsSL -o /tmp/kubectl "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
+          sudo install -m 0755 /tmp/kubectl /usr/local/bin/kubectl
+          curl -fsSL -o /tmp/helm.tgz "https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz"
+          tar -C /tmp -xzf /tmp/helm.tgz
+          sudo install -m 0755 /tmp/linux-amd64/helm /usr/local/bin/helm
+      - name: Smoke test the chart on kind
+        run: make kind-smoke
+      - name: Delete the kind cluster
+        if: always()
+        run: |
+          source scripts/versions.env
+          kind delete cluster --name "$CLUSTER_NAME" || true
