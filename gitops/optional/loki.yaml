@@ -1,0 +1,30 @@
+# Optional. This Application is not in gitops/apps, so the root
+# Application does not install Loki. Apply it with: make kind-loki
+# A log collector is not included. This only runs the Loki server.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: loki
+  namespace: argocd
+spec:
+  project: default
+  sources:
+    - repoURL: https://grafana.github.io/helm-charts
+      chart: loki
+      targetRevision: 7.6.0
+      helm:
+        valueFiles:
+          - $values/gitops/optional/loki-values.yaml
+    - repoURL: https://github.com/AyazAI/k8s-gitops-observability.git
+      targetRevision: main
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: loki
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

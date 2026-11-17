@@ -1,0 +1,12 @@
+{{- if .Values.grafanaDashboard.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "portfolio-sample.fullname" . }}-dashboard
+  labels:
+    {{- include "portfolio-sample.labels" . | nindent 4 }}
+    grafana_dashboard: "1"
+data:
+  portfolio-sample.json: |
+{{ .Files.Get "dashboards/portfolio-sample.json" | indent 4 }}
+{{- end }}

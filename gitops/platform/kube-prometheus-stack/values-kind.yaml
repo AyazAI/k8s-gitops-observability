@@ -1,0 +1,66 @@
+# Local kind overlay. The Application in gitops/apps includes this file
+# because the cluster this repository runs is a single-node kind cluster.
+# Raise these requests before pointing the same chart at a larger cluster.
+# This file does not set a Grafana password.
+
+alertmanager:
+  alertmanagerSpec:
+    retention: 24h
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
+
+grafana:
+  defaultDashboardsEnabled: false
+  persistence:
+    enabled: false
+  resources:
+    requests:
+      cpu: 20m
+      memory: 64Mi
+    limits:
+      cpu: 300m
+      memory: 384Mi
+
+prometheusOperator:
+  resources:
+    requests:
+      cpu: 20m
+      memory: 32Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+kube-state-metrics:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+prometheus-node-exporter:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 16Mi
+    limits:
+      cpu: 100m
+      memory: 64Mi
+
+prometheus:
+  prometheusSpec:
+    scrapeInterval: 15s
+    retention: 6h
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: "1"
+        memory: 768Mi

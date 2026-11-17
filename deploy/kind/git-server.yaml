@@ -1,0 +1,48 @@
+# Local kind bootstrap only. This serves a mirror of the working tree so
+# Argo CD can sync before the GitHub repository is public. It is not part
+# of the root Application.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: git-system
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: git-server
+  namespace: git-system
+  labels:
+    app: git-server
+spec:
+  containers:
+    - name: git
+      image: portfolio-git-server:dev
+      imagePullPolicy: IfNotPresent
+      ports:
+        - name: http
+          containerPort: 8080
+      readinessProbe:
+        httpGet:
+          path: /healthz
+          port: http
+        initialDelaySeconds: 1
+        periodSeconds: 2
+      volumeMounts:
+        - name: repos
+          mountPath: /srv/git
+  volumes:
+    - name: repos
+      emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: git-server
+  namespace: git-system
+spec:
+  selector:
+    app: git-server
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http

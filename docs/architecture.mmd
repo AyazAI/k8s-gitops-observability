@@ -1,0 +1,26 @@
+flowchart TB
+  subgraph git [Git repository]
+    chart[Helm chart portfolio-sample]
+    apps[gitops/apps]
+    values[kube-prometheus-stack values]
+  end
+  subgraph cluster [kind cluster]
+    root[Argo CD root Application]
+    promApp[kube-prometheus-stack]
+    sampleApp[portfolio-sample]
+    metrics[metrics-server]
+    prom[Prometheus]
+    graf[Grafana]
+    pods[portfolio-sample pods]
+  end
+  apps --> root
+  root --> promApp
+  root --> sampleApp
+  root --> metrics
+  values --> promApp
+  chart --> sampleApp
+  promApp --> prom
+  promApp --> graf
+  sampleApp --> pods
+  pods -->|"GET /metrics"| prom
+  prom --> graf
